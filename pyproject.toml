@@ -1,0 +1,32 @@
+[project]
+name = "sansa-agent"
+version = "0.1.0"
+description = "On-prem agent for Sansa. Watches folders and reports file changes."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27,<1.0",
+    "watchdog>=4.0,<6.0",
+    "tenacity>=8.3,<10.0",
+]
+
+[project.scripts]
+ sansa-agent = "sansa_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "ruff>=0.6,<1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sansa_agent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
