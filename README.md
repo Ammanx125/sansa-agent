@@ -1,1 +1,0 @@
-sansa-agent enroll --server-url http://127.0.0.1:8000 --enrollment-token gVzkPpP-q9xHoz6RAvM9bbHVrMDQkysjJzAE6P6cGoE --watch-root ./test-folder
