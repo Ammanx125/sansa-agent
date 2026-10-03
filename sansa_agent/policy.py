@@ -22,8 +22,6 @@ from pathlib import Path
 ALLOWED_JOB_TYPES = frozenset({
     "upload_file",
     "rescan",
-    "rotate_credential",
-    "update_config",
 })
 
 

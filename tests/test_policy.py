@@ -19,6 +19,15 @@ def test_rejects_unknown_job_type():
         assert "unknown job type" in decision.reason
 
 
+def test_rejects_unimplemented_job_types():
+    with tempfile.TemporaryDirectory() as d:
+        p = _policy(Path(d))
+        for job_type in ("rotate_credential", "update_config"):
+            decision = p.check_job(job_type, {})
+            assert not decision.allowed
+            assert "unknown job type" in decision.reason
+
+
 def test_rejects_path_outside_watch_root():
     with tempfile.TemporaryDirectory() as d:
         p = _policy(Path(d))

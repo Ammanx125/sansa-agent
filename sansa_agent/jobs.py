@@ -7,14 +7,18 @@ it if allowed, and reports the outcome.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
 from sansa_agent.client import SansaClient, SansaClientError
 from sansa_agent.policy import Policy
-from sansa_agent.state import sha256_of
 
 logger = logging.getLogger("sansa_agent.jobs")
+
+
+class JobExecutionError(Exception):
+    """A job could not be safely completed."""
 
 
 async def poll_and_execute_jobs(
@@ -88,12 +92,6 @@ async def _execute_one(
             # A rescan is a no-op at this level; the sync loop performs
             # a rescan on every cycle anyway. Report success.
             pass
-        elif job_type == "rotate_credential":
-            # Deferred. Report rejected with a clear reason.
-            raise NotImplementedError("credential rotation not yet supported")
-        elif job_type == "update_config":
-            # Deferred. Apply the new config locally.
-            raise NotImplementedError("remote config updates not yet supported")
         else:
             raise ValueError(f"unhandled job type: {job_type!r}")
 
@@ -126,16 +124,17 @@ async def _execute_upload_file(
 
     target = (policy.watch_root / path_str).resolve()
     content = target.read_bytes()
-    actual_hash = sha256_of(target)
+    if len(content) > policy.max_upload_bytes:
+        raise JobExecutionError(
+            f"file exceeds size cap ({len(content)} > {policy.max_upload_bytes})"
+        )
 
-    # If the hash doesn't match what Sansa expected, send it anyway.
-    # The server accepts unexpected hashes (documented decision).
+    actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash and actual_hash != expected_hash:
-        logger.info(
-            "file %s has changed (expected %s, got %s); uploading current bytes",
-            path_str, expected_hash, actual_hash,
+        raise JobExecutionError(
+            f"file changed before upload: expected {expected_hash}, got {actual_hash}"
         )
 
     await client.upload_content(
-        agent_id=agent_id, content_hash=expected_hash or actual_hash, content=content
+        agent_id=agent_id, content_hash=actual_hash, content=content
     )
