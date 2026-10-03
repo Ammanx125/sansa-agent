@@ -19,12 +19,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from sansa_agent import config as cfg
 from sansa_agent.client import SansaClient, SansaClientError
+from sansa_agent.policy import Policy
 from sansa_agent.state import compute_deltas, scan, to_sync_payload
 
 logger = logging.getLogger("sansa_agent")
@@ -49,16 +49,22 @@ async def run_sync_loop(
         base_url=data["server_url"],
         credential=data["credential"],
     )
+    policy = Policy(
+        watch_root=watch_root,
+        max_upload_bytes=200 * 1024 * 1024,
+    )
+
+    from sansa_agent.jobs import poll_and_execute_jobs
 
     cycle = 0
     logger.info("agent started; watching %s every %ds", watch_root, interval_seconds)
 
     while not stop_event.is_set():
         try:
+            # 1. Sync deltas (metadata only).
             current = scan(watch_root)
             previous = data.get("files", {})
             deltas = compute_deltas(current=current, previous=previous)
-
             if deltas:
                 payload = to_sync_payload(deltas)
                 result = await client.sync(
@@ -76,6 +82,17 @@ async def run_sync_loop(
                 }
                 cfg.save(data)
 
+            # 2. Poll and execute jobs (content upload, rescan, etc.).
+            processed = await poll_and_execute_jobs(
+                client=client,
+                agent_id=data["agent_id"],
+                policy=policy,
+                config=data,
+            )
+            if processed:
+                logger.info("processed %d job(s)", processed)
+
+            # 3. Heartbeat every N cycles.
             cycle += 1
             if cycle % HEARTBEAT_EVERY_N_CYCLES == 0:
                 await client.heartbeat(
@@ -88,17 +105,17 @@ async def run_sync_loop(
                 )
 
         except SansaClientError as exc:
-            logger.warning("sync failed, will retry: %s", exc)
+            logger.warning("cycle failed, will retry: %s", exc)
         except Exception:
             logger.exception("unexpected error in sync loop")
 
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
     logger.info("agent stopped")
-
+    
 
 async def main_async(*, interval_seconds: int = 60) -> None:
     logging.basicConfig(

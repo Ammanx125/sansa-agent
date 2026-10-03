@@ -93,9 +93,8 @@ def compute_deltas(
             status=status,
         ))
 
-    for path in previous:
+    for path, prev in previous.items():
         if path not in current:
-            prev = previous[path]
             deltas.append(FileDelta(
                 path=path,
                 content_hash=prev["hash"],
