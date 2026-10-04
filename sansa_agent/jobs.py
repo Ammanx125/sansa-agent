@@ -138,3 +138,9 @@ async def _execute_upload_file(
     await client.upload_content(
         agent_id=agent_id, content_hash=actual_hash, content=content
     )
+    logger.info(
+        "uploaded %s (%d bytes; sha256 %s)",
+        path_str,
+        len(content),
+        actual_hash[:12],
+    )

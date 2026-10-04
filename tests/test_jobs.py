@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -9,7 +10,8 @@ from sansa_agent.jobs import _execute_one
 from sansa_agent.policy import Policy
 
 
-def test_upload_uses_hash_of_uploaded_bytes(tmp_path: Path):
+def test_upload_uses_hash_of_uploaded_bytes(tmp_path: Path, caplog):
+    caplog.set_level(logging.INFO, logger="sansa_agent.jobs")
     content = b"current content"
     (tmp_path / "data.csv").write_bytes(content)
     client = AsyncMock()
@@ -43,6 +45,7 @@ def test_upload_uses_hash_of_uploaded_bytes(tmp_path: Path):
         status="completed",
         result={},
     )
+    assert "uploaded data.csv" in caplog.text
 
 
 def test_upload_rejects_content_with_unexpected_hash(tmp_path: Path):
